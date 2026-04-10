@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语课堂反馈单制作工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { primary: '#1F286F', secondary: '#4A6FA5', accent: '#F5A623' }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .scrollbar-beautify { scrollbar-width: thin; scrollbar-color: #4A6FA5 #f1f5f9; }
+            .scrollbar-beautify::-webkit-scrollbar { width: 6px; }
+            .scrollbar-beautify::-webkit-scrollbar-thumb { background: #4A6FA5; border-radius: 8px; }
+            .input-focus { @apply focus:ring-2 focus:ring-accent focus:border-accent focus:outline-none; }
+            .preserve-breaks { white-space: pre-wrap; word-break: break-all; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 max-h-[90vh] overflow-y-auto scrollbar-beautify">
+                <div class="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 pb-4 border-b">
+                    <div class="flex flex-col">
+                        <h2 class="text-xl font-bold text-primary">内容编辑</h2>
+                        <span class="text-[10px] text-green-500 font-bold mt-1">● 浏览器自动实时保存中</span>
+                    </div>
+                    <div class="space-x-2 flex">
+                        <button onclick="exportJSON()" class="bg-gray-800 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-black transition-all">导出JSON</button>
+                        <label class="bg-gray-500 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-600 transition-all cursor-pointer">
+                            导入JSON <input type="file" id="importJson" accept=".json" class="hidden" onchange="importJSON(event)">
+                        </label>
+                        <button id="downloadBtn" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-opacity-90 transition-all">生成反馈图</button>
+                    </div>
+                </div>
+
+                <section class="mb-8 space-y-4">
+                    <h3 class="font-bold border-l-4 border-accent pl-2 mb-4">🗓 基础信息</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="date" id="input-date" class="border p-2 rounded-lg text-sm input-focus">
+                        <input type="text" id="input-unit" placeholder="单元名称 (大标题)" class="border p-2 rounded-lg text-sm input-focus">
+                        <input type="text" id="input-teacher" placeholder="教师姓名" class="border p-2 rounded-lg text-sm input-focus">
+                        <input type="text" id="input-class" placeholder="班级名称 (标签小标)" class="border p-2 rounded-lg text-sm input-focus">
+                        <div class="flex items-center gap-1 border rounded-lg px-2 col-span-2 md:col-span-1">
+                            <span class="text-sm">⏰</span>
+                            <input type="number" id="input-prog-session" placeholder="消耗" class="w-16 p-1 text-center outline-none text-sm"><span class="text-xs text-gray-400">h</span>
+                            <span class="mx-2 text-gray-300">|</span>
+                            <span class="text-sm">⏳</span>
+                            <input type="number" id="input-prog-cur" placeholder="已消" class="w-12 p-1 text-center outline-none text-sm">
+                            <span class="text-gray-400">/</span>
+                            <input type="number" id="input-prog-tot" placeholder="总计" class="w-12 p-1 text-center outline-none text-sm">
+                        </div>
+                        <input type="text" id="input-students" placeholder="到课学生 (用/分隔)" class="border p-2 rounded-lg text-sm input-focus">
+                    </div>
+                </section>
+
+                <section class="mb-8">
+                    <h3 class="font-bold border-l-4 border-accent pl-2 mb-4">📸 课堂照片</h3>
+                    <input type="file" id="photoInput" accept="image/*" multiple class="text-sm block w-full text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-opacity-80">
+                </section>
+
+                <section class="mb-8 space-y-4">
+                    <h3 class="font-bold border-l-4 border-accent pl-2 mb-4">📖 课堂内容</h3>
+                    <textarea id="input-supply" rows="3" class="w-full border p-3 rounded-lg text-sm input-focus" placeholder="⛽️ 能量补给..."></textarea>
+                    <textarea id="input-comment" rows="3" class="w-full border p-3 rounded-lg text-sm input-focus" placeholder="💬 老师点评..."></textarea>
+                    <textarea id="input-suggestion" rows="3" class="w-full border p-3 rounded-lg text-sm input-focus" placeholder="🔧 巩固建议..."></textarea>
+                </section>
+
+                <section class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold border-l-4 border-accent pl-2">🌟 能量之星</h3>
+                        <button onclick="addStudentStar()" class="text-xs bg-accent text-white px-3 py-1 rounded-full hover:bg-opacity-80 font-bold">+ 添加学生</button>
+                    </div>
+                    <div id="star-editor-list" class="space-y-4"></div>
+                </section>
+
+                <section class="mb-8 space-y-4">
+                    <h3 class="font-bold border-l-4 border-accent pl-2 mb-4">📝 任务提醒</h3>
+                    <div class="space-y-3 bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2"><input type="checkbox" id="chk-voice"> <label class="text-sm font-bold">🎤 语音任务</label></div>
+                            <textarea id="input-voice" rows="2" class="w-full border p-2 rounded text-sm hidden" placeholder="录音要求..."></textarea>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2"><input type="checkbox" id="chk-write"> <label class="text-sm font-bold">✒️ 书写任务</label></div>
+                            <textarea id="input-write" rows="2" class="w-full border p-2 rounded text-sm hidden" placeholder="书写要求..."></textarea>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2"><input type="checkbox" id="chk-listen"> <label class="text-sm font-bold">🎧 磨耳朵</label></div>
+                            <textarea id="input-listen" rows="2" class="w-full border p-2 rounded text-sm hidden" placeholder="听力要求..."></textarea>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2"><input type="checkbox" id="chk-word"> <label class="text-sm font-bold">🔍 单词闯关</label></div>
+                            <textarea id="input-word" rows="2" class="w-full border p-2 rounded text-sm hidden" placeholder="闯关要求..."></textarea>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2"><input type="checkbox" id="chk-read"> <label class="text-sm font-bold">📚 拓展阅读</label></div>
+                            <textarea id="input-read" rows="2" class="w-full border p-2 rounded text-sm hidden" placeholder="阅读要求..."></textarea>
+                        </div>
+                        <div class="pt-2 border-t border-gray-200 mt-2">
+                            <label class="text-xs font-bold text-gray-500 mb-1 block">⏰ 截止时间 Deadline</label>
+                            <input type="datetime-local" id="input-deadline" class="w-full border p-2 rounded text-sm input-focus">
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <h3 class="font-bold border-l-4 border-accent pl-2 mb-4">📢 底部标语</h3>
+                    <textarea id="input-slogan" rows="2" class="w-full border p-3 rounded-lg text-sm input-focus"></textarea>
+                </section>
+            </div>
+
+            <div class="sticky top-8 flex flex-col items-center">
+                <div class="mb-4 flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow-sm w-full max-w-[450px] border border-gray-200 z-20">
+                    <span class="text-xs text-gray-500 font-bold whitespace-nowrap">↕️ 预览滑动</span>
+                    <input type="range" id="preview-scroll" min="0" max="100" step="1" value="0" class="w-full accent-primary cursor-pointer">
+                    <button onclick="resetScroll()" class="text-[11px] bg-gray-100 text-gray-500 hover:text-primary hover:bg-gray-200 px-2 py-1 rounded transition-colors font-bold whitespace-nowrap">复位</button>
+                </div>
+
+                <div id="preview-wrapper" class="transition-transform duration-100 ease-out">
+                    <div id="preview-card" class="w-[450px] bg-white shadow-2xl overflow-hidden min-h-[667px] flex flex-col">
+                        <div class="p-6 flex-grow">
+                            <div class="text-center border-b-2 border-primary pb-4 mb-4">
+                                <h2 class="text-2xl font-black text-primary tracking-tighter">CLASS FEEDBACK</h2>
+                                <p class="text-[10px] text-gray-400 font-bold tracking-widest uppercase mt-1">BOBOspeak English Studio</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-y-2 text-[11px] text-gray-600 mb-5 bg-gray-50 pt-1 pb-5 px-3 rounded-lg">
+                                <div id="view-date">🗓 --/--/--</div>
+                                <div id="view-unit">📖 --</div>
+                                <div id="view-teacher">👨‍🏫 --</div>
+                                <div id="view-class">🏫 --</div>
+                                <div id="view-progress" class="col-span-2">⏰ -- h | ⏳ --/-- h</div>
+                                <div id="view-students" class="col-span-2 text-primary font-bold border-t border-gray-200 pt-2 mt-1">🧒 --</div>
+                            </div>
+
+                            <div id="view-photos" class="hidden"></div>
+
+                            <div class="space-y-4">
+                                <div class="border-l-4 border-primary pl-3"><h4 class="text-[13px] font-bold text-primary mb-1 italic">⛽️ 能量补给 Supply</h4><p id="view-supply" class="text-[11px] leading-relaxed text-gray-700 preserve-breaks"></p></div>
+                                <div class="border-l-4 border-accent pl-3"><h4 class="text-[13px] font-bold text-accent mb-1 italic">💬 老师点评 Comment</h4><p id="view-comment" class="text-[11px] leading-relaxed text-gray-700 italic preserve-breaks"></p></div>
+                                <div class="border-l-4 border-secondary pl-3"><h4 class="text-[13px] font-bold text-secondary mb-1 italic">🔧 巩固建议 Advice</h4><p id="view-suggestion" class="text-[11px] leading-relaxed text-gray-700 preserve-breaks"></p></div>
+                            </div>
+
+                            <div id="view-star-section" class="mt-5 bg-amber-50 pt-2 pb-6 px-4 rounded-xl border border-amber-100 hidden">
+                                <h4 class="text-[12px] font-bold text-amber-600 mb-3.5 italic flex items-center gap-1 uppercase tracking-wider">🌟 能量之星 STAR STUDENT</h4>
+                                <div id="view-star-list" class="space-y-2.5"></div>
+                            </div>
+
+                            <div class="mt-6">
+                                <h4 class="text-[13px] font-bold text-secondary mb-2 italic flex items-center gap-1">📝 任务内容 HOMEWORK</h4>
+                                <div id="view-task-list" class="text-[10.5px] space-y-2 bg-slate-50 pt-1.5 pb-5 px-3 rounded-t-lg border border-slate-100 text-gray-600"></div>
+                                <div id="view-deadline-container" class="hidden bg-slate-200 pt-1 pb-4 px-3 rounded-b-lg flex justify-between items-center text-[10px] border-x border-b border-slate-100">
+                                    <span class="font-bold text-gray-500">截止时间 Deadline</span>
+                                    <span id="view-deadline" class="text-primary font-black"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-primary pt-2 pb-6 px-4 text-center mt-auto">
+                            <p id="view-slogan" class="text-white text-[10px] preserve-breaks opacity-90"></p>
+                        </div>
+                    </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let state = {
+            basic: { date: '', unit: '', teacher: 'Via', className: '', progSession: '', progCur: '', progTot: '', students: '' },
+            photos: [],
+            content: { supply: '', comment: '', suggestion: '' },
+            stars: [{ name: '', items: [{ perf: '', grade: 'A+' }] }],
+            tasks: { voice: '', write: '', listen: '', word: '', read: '', deadline: '' },
+            slogan: '让英语不止是学科，更是未来竞争力！\nBOBOspeak 英语工作室'
+        };
+
+        function init() { 
+            const saved = localStorage.getItem('bobospeak_autosave_data');
+            if (saved) { 
+                try {
+                    state = JSON.parse(saved); 
+                } catch(e) { console.error("读取存档失败", e); }
+            }
+            syncStateToUI(); 
+            renderStarEditor(); 
+            bindEvents(); 
+            updatePreview(); 
+            bindScrollEvent();
+        }
+
+        function autoSave() {
+            try {
+                localStorage.setItem('bobospeak_autosave_data', JSON.stringify(state));
+            } catch (e) {
+                const stateWithoutPhotos = { ...state, photos: [] };
+                localStorage.setItem('bobospeak_autosave_data', JSON.stringify(stateWithoutPhotos));
+                console.warn('存储空间受限，照片未能保存至本地草稿。');
+            }
+        }
+
+        function exportJSON() {
+            const dataStr = JSON.stringify(state, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const mainTitle = (state.basic.unit || '未命名大标题').trim().replace(/[\/\\:*?"<>|]/g, '-');
+            const subTag = (state.basic.className || '未命名小标').trim().replace(/[\/\\:*?"<>|]/g, '-');
+            const dStr = (state.basic.date || '未记录日期').replace(/[\/\\:*?"<>|]/g, '-');
+            // JSON 保持原有的备份命名格式
+            const fileName = `${mainTitle}-${subTag}-备份草稿-${dStr}.json`;
+            
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    state = JSON.parse(e.target.result);
+                    syncStateToUI();
+                    renderStarEditor();
+                    updatePreview();
+                    autoSave();
+                    resetScroll(); 
+                    alert('✅ 存档导入成功！');
+                } catch(err) {
+                    alert('❌ 导入失败，请确保选择了正确的JSON文件。');
+                }
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
+        }
+
+        function bindEvents() {
+            const inputMap = { 'input-date': 'date', 'input-unit': 'unit', 'input-teacher': 'teacher', 'input-class': 'className', 'input-prog-session': 'progSession', 'input-prog-cur': 'progCur', 'input-prog-tot': 'progTot', 'input-students': 'students' };
+            Object.entries(inputMap).forEach(([id, key]) => { 
+                document.getElementById(id).addEventListener('input', e => { state.basic[key] = e.target.value; updatePreview(); autoSave(); }); 
+            });
+            document.getElementById('input-supply').addEventListener('input', e => { state.content.supply = e.target.value; updatePreview(); autoSave(); });
+            document.getElementById('input-comment').addEventListener('input', e => { state.content.comment = e.target.value; updatePreview(); autoSave(); });
+            document.getElementById('input-suggestion').addEventListener('input', e => { state.content.suggestion = e.target.value; updatePreview(); autoSave(); });
+            document.getElementById('input-slogan').addEventListener('input', e => { state.slogan = e.target.value; updatePreview(); autoSave(); });
+            document.getElementById('input-deadline').addEventListener('input', e => { state.tasks.deadline = e.target.value; updatePreview(); autoSave(); });
+            
+            ['voice', 'write', 'listen', 'word', 'read'].forEach(k => {
+                const chk = document.getElementById(`chk-${k}`);
+                const area = document.getElementById(`input-${k}`);
+                if(chk) {
+                    chk.onchange = () => { area.classList.toggle('hidden', !chk.checked); if(!chk.checked) state.tasks[k] = ''; updatePreview(); autoSave(); };
+                    area.addEventListener('input', e => { state.tasks[k] = e.target.value; updatePreview(); autoSave(); });
+                }
+            });
+            document.getElementById('photoInput').onchange = (e) => {
+                state.photos = [];
+                Array.from(e.target.files).slice(0, 4).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => { state.photos.push(ev.target.result); updatePreview(); autoSave(); };
+                    reader.readAsDataURL(file);
+                });
+            };
+            document.getElementById('downloadBtn').onclick = download;
+        }
+
+        function bindScrollEvent() {
+            const scrollInput = document.getElementById('preview-scroll');
+            const wrapper = document.getElementById('preview-wrapper');
+            const card = document.getElementById('preview-card');
+
+            scrollInput.addEventListener('input', () => {
+                const val = scrollInput.value; 
+                const visibleHeight = window.innerHeight - 200; 
+                const maxScroll = Math.max(0, card.scrollHeight - visibleHeight);
+                const translateY = - (maxScroll * (val / 100));
+                
+                wrapper.style.transform = `translateY(${translateY}px)`;
+            });
+        }
+
+        window.resetScroll = () => {
+            const scrollInput = document.getElementById('preview-scroll');
+            scrollInput.value = 0;
+            scrollInput.dispatchEvent(new Event('input')); 
+        };
+
+        function renderStarEditor() {
+            const container = document.getElementById('star-editor-list');
+            container.innerHTML = '';
+            state.stars.forEach((student, sIdx) => {
+                const sDiv = document.createElement('div');
+                sDiv.className = "bg-white border-2 border-dashed border-gray-200 p-3 rounded-xl relative";
+                sDiv.innerHTML = `
+                    <div class="flex items-center gap-2 mb-2">
+                        <input type="text" placeholder="姓名" value="${student.name}" class="font-bold text-sm border-b-2 border-primary outline-none w-24 p-1" oninput="updateStudentName(${sIdx}, this.value)">
+                        <button onclick="addPerformanceItem(${sIdx})" class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-200">+ 表现</button>
+                        <button onclick="removeStudent(${sIdx})" class="absolute top-2 right-2 text-gray-300">✕</button>
+                    </div>
+                    <div class="space-y-2">
+                        ${student.items.map((item, iIdx) => `
+                            <div class="flex gap-2 items-center bg-gray-50 p-2 rounded-lg">
+                                <input type="text" placeholder="表现" value="${item.perf}" class="flex-grow p-1 border rounded text-xs" oninput="updateItemData(${sIdx}, ${iIdx}, 'perf', this.value)">
+                                <select class="text-xs border rounded p-1" onchange="updateItemData(${sIdx}, ${iIdx}, 'grade', this.value)">
+                                    <option ${item.grade=='A+'?'selected':''}>A+</option><option ${item.grade=='A'?'selected':''}>A</option><option ${item.grade=='A-'?'selected':''}>A-</option>
+                                </select>
+                                <button onclick="removeItemData(${sIdx}, ${iIdx})" class="text-gray-400 px-1">✕</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(sDiv);
+            });
+        }
+        
+        window.addStudentStar = () => { state.stars.push({ name: '', items: [{ perf: '', grade: 'A+' }] }); renderStarEditor(); updatePreview(); autoSave(); };
+        window.removeStudent = (sIdx) => { state.stars.splice(sIdx, 1); renderStarEditor(); updatePreview(); autoSave(); };
+        window.updateStudentName = (sIdx, val) => { state.stars[sIdx].name = val; updatePreview(); autoSave(); };
+        window.addPerformanceItem = (sIdx) => { state.stars[sIdx].items.push({ perf: '', grade: 'A+' }); renderStarEditor(); updatePreview(); autoSave(); };
+        window.removeItemData = (sIdx, iIdx) => { state.stars[sIdx].items.splice(iIdx, 1); if(state.stars[sIdx].items.length === 0) state.stars.splice(sIdx, 1); renderStarEditor(); updatePreview(); autoSave(); };
+        window.updateItemData = (sIdx, iIdx, key, val) => { state.stars[sIdx].items[iIdx][key] = val; updatePreview(); autoSave(); };
+
+        function updatePreview() {
+            document.getElementById('view-date').innerText = `🗓 ${state.basic.date || '--/--/--'}`;
+            document.getElementById('view-unit').innerText = `📖 ${state.basic.unit || '--'}`;
+            document.getElementById('view-teacher').innerText = `👨‍🏫 ${state.basic.teacher || '--'}`;
+            document.getElementById('view-class').innerText = `🏫 ${state.basic.className || '--'}`;
+            document.getElementById('view-progress').innerText = `⏰ ${state.basic.progSession || 0} h | ⏳ ${state.basic.progCur || 0}/${state.basic.progTot || 0} h`;
+            document.getElementById('view-students').innerText = `🧒 ${state.basic.students || '--'}`;
+            document.getElementById('view-supply').innerText = state.content.supply || '录入核心词汇与句型...';
+            document.getElementById('view-comment').innerText = state.content.comment || '宝贝表现出色，继续加油！';
+            document.getElementById('view-suggestion').innerText = state.content.suggestion || '建议多练习...';
+            document.getElementById('view-slogan').innerText = state.slogan;
+
+            const photoBox = document.getElementById('view-photos');
+            
+            let gridClass = "grid gap-2 mb-6";
+            
+            if (state.photos.length === 1) {
+                // 只有 1 张图时：不锁死高度，允许图片自然撑开（最高放宽到 350px），绝不压扁
+                gridClass += " grid-cols-1";
+                photoBox.innerHTML = state.photos.map(p => `
+                    <img src="${p}" class="w-full max-h-[350px] rounded-lg shadow border border-gray-100" style="object-fit: cover; object-position: center; display: block;">
+                `).join('');
+            } else {
+                // 2 张图及以上时：双列排版，采用经典的 4:3 照片比例，整齐且不会过度裁剪
+                gridClass += " grid-cols-2";
+                photoBox.innerHTML = state.photos.map(p => `
+                    <img src="${p}" class="w-full aspect-[4/3] rounded-lg shadow border border-gray-100" style="object-fit: cover; object-position: center; display: block;">
+                `).join('');
+            }
+
+            photoBox.className = state.photos.length === 0 ? "hidden" : gridClass;
+
+            const starBox = document.getElementById('view-star-section');
+            const starList = document.getElementById('view-star-list');
+            const validStudents = state.stars.filter(s => s.name && s.items.some(i => i.perf));
+            if (validStudents.length === 0) { starBox.classList.add('hidden'); } 
+            else {
+                starBox.classList.remove('hidden');
+                starList.innerHTML = validStudents.map(student => `
+                    <div class="flex items-start gap-8 border-b border-amber-200 border-dotted pb-1.5 last:border-0 last:pb-0">
+                        <div class="shrink-0 font-bold text-gray-800 text-[11px] min-w-[4.5em] h-[18px] flex items-center">${student.name}</div>
+                        <div class="flex flex-wrap gap-x-5 gap-y-1 items-center">
+                            ${student.items.filter(i => i.perf).map(item => `
+                                <div class="flex items-center h-[18px]">
+                                    <span class="text-gray-600 text-[10.5px] mr-1 leading-none">${item.perf}</span>
+                                    <span class="text-accent font-black italic text-[10px] transform translate-y-[0.5px]">${item.grade}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const taskBox = document.getElementById('view-task-list');
+            const t = state.tasks;
+            let html = '';
+            if(t.voice) html += `<div class="flex gap-2"><span>🎤</span><p class="preserve-breaks">${t.voice}</p></div>`;
+            if(t.write) html += `<div class="flex gap-2"><span>✒️</span><p class="preserve-breaks">${t.write}</p></div>`;
+            if(t.listen) html += `<div class="flex gap-2"><span>🎧</span><p class="preserve-breaks">${t.listen}</p></div>`;
+            if(t.word) html += `<div class="flex gap-2"><span>🔍</span><p class="preserve-breaks">${t.word}</p></div>`;
+            if(t.read) html += `<div class="flex gap-2"><span>📚</span><p class="preserve-breaks">${t.read}</p></div>`;
+            taskBox.innerHTML = html || '<p class="text-gray-400 italic text-[9px]">今日无书面任务</p>';
+
+            const dlContainer = document.getElementById('view-deadline-container');
+            if(state.tasks.deadline) {
+                dlContainer.classList.remove('hidden');
+                document.getElementById('view-deadline').innerText = state.tasks.deadline.replace('T', ' ');
+            } else { dlContainer.classList.add('hidden'); }
+        }
+
+        function syncStateToUI() {
+            Object.keys(state.basic).forEach(k => {
+                const el = document.getElementById(`input-${k.replace('className','class').replace('progSession','prog-session').replace('progCur','prog-cur').replace('progTot','prog-tot')}`);
+                if(el) el.value = state.basic[k];
+            });
+            document.getElementById('input-supply').value = state.content.supply;
+            document.getElementById('input-comment').value = state.content.comment;
+            document.getElementById('input-suggestion').value = state.content.suggestion;
+            document.getElementById('input-slogan').value = state.slogan;
+            document.getElementById('input-deadline').value = state.tasks.deadline || '';
+            ['voice','write','listen','word','read'].forEach(k => {
+                const chk = document.getElementById(`chk-${k}`);
+                const area = document.getElementById(`input-${k}`);
+                if (state.tasks[k]) { chk.checked = true; area.classList.remove('hidden'); area.value = state.tasks[k]; }
+                else { chk.checked = false; area.classList.add('hidden'); area.value = ''; }
+            });
+        }
+
+        async function download() {
+            const wrapper = document.getElementById('preview-wrapper');
+            const originalTransform = wrapper.style.transform;
+            
+            wrapper.style.transform = 'translateY(0px)'; 
+            
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            const el = document.getElementById('preview-card');
+            const canvas = await html2canvas(el, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff' });
+            
+            wrapper.style.transform = originalTransform; 
+            
+            const cName = (state.basic.className || '未命名班级').trim().replace(/[\/\\:*?"<>|]/g, '-');
+            const dStr = (state.basic.date || '未记录日期').replace(/[\/\\:*?"<>|]/g, '-');
+            const fileName = `英语课堂反馈单_${cName}_${dStr}.png`;
+            
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = canvas.toDataURL("image/png", 1.0);
+            link.click();
+        }
+
+        init();
+    </script>
+</body>
+</html>
