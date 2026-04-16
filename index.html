@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -120,15 +121,9 @@
                 </section>
             </div>
 
-            <div class="sticky top-8 flex flex-col items-center">
-                <div class="mb-4 flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow-sm w-full max-w-[450px] border border-gray-200 z-20">
-                    <span class="text-xs text-gray-500 font-bold whitespace-nowrap">↕️ 预览滑动</span>
-                    <input type="range" id="preview-scroll" min="0" max="100" step="1" value="0" class="w-full accent-primary cursor-pointer">
-                    <button onclick="resetScroll()" class="text-[11px] bg-gray-100 text-gray-500 hover:text-primary hover:bg-gray-200 px-2 py-1 rounded transition-colors font-bold whitespace-nowrap">复位</button>
-                </div>
-
-                <div id="preview-wrapper" class="transition-transform duration-100 ease-out">
-                    <div id="preview-card" class="w-[450px] bg-white shadow-2xl overflow-hidden min-h-[667px] flex flex-col">
+            <div class="sticky top-8 flex justify-center">
+                <div id="preview-scroll-container" class="max-h-[90vh] overflow-y-auto scrollbar-beautify rounded-xl shadow-2xl w-[450px]">
+                    <div id="preview-card" class="w-full bg-white overflow-hidden min-h-[667px] flex flex-col">
                         <div class="p-6 flex-grow">
                             <div class="text-center border-b-2 border-primary pb-4 mb-4">
                                 <h2 class="text-2xl font-black text-primary tracking-tighter">CLASS FEEDBACK</h2>
@@ -426,17 +421,18 @@
         }
 
         async function download() {
-            const wrapper = document.getElementById('preview-wrapper');
-            const originalTransform = wrapper.style.transform;
-            
-            wrapper.style.transform = 'translateY(0px)'; 
+            // 截图前自动让滚动条回到顶部，防止 html2canvas 截图被截断
+            const scrollContainer = document.getElementById('preview-scroll-container');
+            const originalScrollTop = scrollContainer.scrollTop;
+            scrollContainer.scrollTop = 0; 
             
             await new Promise(resolve => setTimeout(resolve, 50));
 
             const el = document.getElementById('preview-card');
             const canvas = await html2canvas(el, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff' });
             
-            wrapper.style.transform = originalTransform; 
+            // 截图完成后瞬间恢复你原本浏览的滚动位置
+            scrollContainer.scrollTop = originalScrollTop; 
             
             const cName = (state.basic.className || '未命名班级').trim().replace(/[\/\\:*?"<>|]/g, '-');
             const dStr = (state.basic.date || '未记录日期').replace(/[\/\\:*?"<>|]/g, '-');
